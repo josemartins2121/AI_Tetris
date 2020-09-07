@@ -140,8 +140,10 @@ class piece:
         if not pos_valid(self,locked_positions):
             self.y -=  size_piece
     def change_orientation(self):
+        previous = self.orientation
         self.orientation = (self.orientation + 1) % len(self.shape)
-
+        if not pos_valid(self,locked_positions):
+            self.orientation = previous
 
 
 def get_piece():
@@ -150,84 +152,80 @@ def get_piece():
 
 
 def print_shape(piece):
-    x=-2
-    y=-2
-    #aux_l=[] 
-    for lines in piece.shape[piece.orientation]:
-        for point in lines:
-            #print(point,end ="")
-            if point == '0':
-                pygame.draw.rect(background,piece.color, (piece.x+x*size_piece,piece.y+y*size_piece,size_piece,size_piece))
-            x+=1
-            #aux_l.append(piece.shape[piece.orientation].index(lines))
-        x = -2
-        y += 1
-    #print(aux_l)
 
+    for lines_index,lines in enumerate(piece.shape[piece.orientation]):
+        for point_index,point in enumerate(lines):
+            if point == '0':
+                pygame.draw.rect(background,piece.color, (piece.x+(point_index-2)*size_piece,piece.y+(lines_index-2)*size_piece,size_piece,size_piece))
 
 def pos_valid(piece,locked_positions):
-    x=-2
-    y=-2
-    for lines in piece.shape[piece.orientation]:
-        for point in lines:
+
+    for lines_index,lines in enumerate(piece.shape[piece.orientation]):
+        for point_index,point in enumerate(lines):
             if point == '0':
-                curr_point_x = piece.x+x*size_piece
-                curr_point_y = piece.y+y*size_piece
+                curr_point_x = piece.x+(point_index-2)*size_piece
+                curr_point_y = piece.y+(lines_index-2)*size_piece
                 if gap + play_width< curr_point_x+size_piece or gap+play_height < curr_point_y+size_piece or curr_point_x + size_piece <= gap :
                     return False
-                if (curr_point_x,curr_point_y) in locked_positions:
+                if locked_positions[int((curr_point_y-gap)/size_piece)][int((curr_point_x-gap)/size_piece)] != (0,0,0):
                     return False
-            x+=1
-        x = -2
-        y += 1
     return True
 
 def fallen_piece(piece,locked_positions):
-    x=-2
-    y=-2
-    for lines in piece.shape[piece.orientation]:
-        for point in lines:
-            if point == '0':
-                curr_point_x = piece.x+x*size_piece
-                curr_point_y = piece.y+y*size_piece
 
-                if (curr_point_x,curr_point_y+size_piece) in locked_positions or curr_point_y+size_piece == gap+play_height:
+    for lines_index,lines in enumerate(piece.shape[piece.orientation]):
+        for point_index,point in enumerate(lines):
+            if point == '0':
+                curr_point_x = piece.x+(point_index-2)*size_piece
+                curr_point_y = piece.y+(lines_index-2)*size_piece
+                if curr_point_y+size_piece == gap+play_height:
                     return True
-            x+=1
-        x = -2
-        y += 1
+                elif locked_positions[int((curr_point_y-gap)/size_piece)+1][int((curr_point_x-gap)/size_piece)] != (0,0,0):
+                    return True
     return False
 
 def add_locked(piece,locked_positions):
-    x=-2
-    y=-2
-    
-    for lines in piece.shape[piece.orientation]:
-        for point in lines:
+    for lines_index,lines in enumerate(piece.shape[piece.orientation]):
+        for point_index,point in enumerate(lines):
             if point == '0':
-                curr_point_x = piece.x+x*size_piece
-                curr_point_y = piece.y+y*size_piece
-                locked_positions [curr_point_x,curr_point_y]=piece.color
-            x+=1
-        x = -2
-        y += 1 
+                curr_point_x = piece.x+(point_index-2)*size_piece
+                curr_point_y = piece.y+(lines_index-2)*size_piece
+                locked_positions[int((curr_point_y-gap)/size_piece)][int((curr_point_x-gap)/size_piece)]=piece.color
+                n_elem[int((curr_point_y-gap)/size_piece)]+=1
 
-def print_locked(locked_positions):
-    for key in locked_positions:
-        x,y = key
-        pygame.draw.rect(background,locked_positions[key],(x,y,size_piece,size_piece))
+def print_locked(locked_positions): 
+    for y in range(20):
+        for x in range(10):
+            if locked_positions[y][x] != (0,0,0):
+                pygame.draw.rect(background,locked_positions[y][x],(x*size_piece+gap,y*size_piece+gap,size_piece,size_piece))
+
+def check_lines(n_elem):
+    for y in range(20):
+        if n_elem[y] == 10:
+            return y
+    return -1
+
+def clear_line(locked_positions,line,n_elem):
+    n_elem[line] = 0
+    for x in range(10):
+        locked_positions[line][x]=(0,0,0)
+    for y in reversed(range(line)):
+        for x in range(10):
+            if locked_positions[y][x] != (0,0,0):
+                n_elem[y] = n_elem[y]-1
+                n_elem[y+1] += 1 
+                previous = locked_positions[y][x]
+                locked_positions[y][x]= (0,0,0)
+                locked_positions[y+1][x] = previous 
+
 
 
 atual_piece = get_piece()
 start_time = time()
-locked_positions = {}
-
-for x,y in zip([p for p in range(-2,2)],[p for p in range(-2,2)]):
-    print(x,y)
-
+locked_positions = [[(0,0,0) for _ in range(10) ]for _ in range(20)]
+n_elem = [0 for _ in range (20)]
 
 while 1:
-    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
@@ -270,9 +268,18 @@ while 1:
     pygame.draw.rect(background, (blue_bg), (gap,gap,play_width,play_height))
     pygame.draw.rect(background, (blue_bg), (play_width+2*gap,gap,150,70))
     pygame.draw.rect(background, (blue_bg), (play_width+2*gap,2*gap+70,150,70))
+    
+    
+    while 1:
+        line = check_lines(n_elem)
+        if line == -1:
+            break
+        clear_line(locked_positions,line,n_elem)
+
+    #print(n_elem)
     print_shape(atual_piece)
     print_locked(locked_positions)
-    
+
     """ print(atual_piece.x)
     print(atual_piece.y)
     print(atual_piece.shape.index)
