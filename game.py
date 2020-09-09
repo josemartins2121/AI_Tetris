@@ -160,11 +160,11 @@ def get_piece():
     return piece(gap+size_piece*5, gap+2*size_piece, shape, colors[random.randint(0, len(colors)-1)], random.randint(0,len(shape)-1))
 
 
-def print_shape(piece):
+def print_shape(piece,x,y ):
     for lines_index,lines in enumerate(piece.shape[piece.orientation]):
         for point_index,point in enumerate(lines):
             if point == '0':
-                pygame.draw.rect(background,piece.color, (piece.x+(point_index-2)*size_piece,piece.y+(lines_index-2)*size_piece,size_piece,size_piece))
+                pygame.draw.rect(background,piece.color, (x+(point_index-2)*size_piece,y+(lines_index-2)*size_piece,size_piece,size_piece))
 
 def pos_valid(piece,locked_positions):
     for lines_index,lines in enumerate(piece.shape[piece.orientation]):
@@ -227,13 +227,14 @@ def clear_line(locked_positions,line,n_elem):
                 locked_positions[y+1][x] = previous 
 
 def show_score(total_points,level):
-    scoretext = myfont.render(str(total_points), 1, (88, 105, 148))
-    leveltext = myfont.render(str(level),1,(88, 105, 148))
+    scoretext = myfont.render("Points: " + str(total_points), 1, (212, 81, 19))
+    leveltext = myfont.render("Level: " + str(level),1,(212, 81, 19))
     scorebox = scoretext.get_rect(center=(gap*2+play_width+75,gap+35))
     levelbox = scoretext.get_rect(center=(gap*2+play_width+75,2*gap+70+35))
     screen.blit(leveltext,levelbox)
     screen.blit(scoretext, scorebox)
 
+next_piece = get_piece()
 atual_piece = get_piece()
 start_time = time()
 start_time_level = time()
@@ -241,10 +242,12 @@ start_time_hard_drop = 0
 locked_positions = [[(0,0,0) for _ in range(10) ]for _ in range(20)]
 n_elem = [0 for _ in range (20)]
 total_points = 0
-myfont = pygame.font.SysFont("Arial",30)
+myfont = pygame.font.SysFont("Arial",20)
 hard_drop_mode = False
 velocity = 0.5
-
+pause = False
+pause_start = 0
+pause_end = 0
 pontuation = [40,100,300,1200]
 
 def add_points_lines(n,level):
@@ -263,46 +266,54 @@ while 1:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 atual_piece = get_piece()
-            if event.key == pygame.K_RIGHT:
-                atual_piece.x += size_piece 
-                #print(pos_valid(atual_piece))
-                if not pos_valid(atual_piece,locked_positions):
-                    atual_piece.x -= size_piece
-            if event.key == pygame.K_LEFT:
-                atual_piece.x -= size_piece 
-                #print(pos_valid(atual_piece))
-                if not pos_valid(atual_piece,locked_positions):
+            if not pause:        
+                if event.key == pygame.K_RIGHT:
                     atual_piece.x += size_piece 
-            if event.key == pygame.K_DOWN:
-                total_points += atual_piece.free_fall() 
-                start_time_hard_drop = time()
-                hard_drop_mode = True
-            if event.key == pygame.K_UP:
-                atual_piece.change_orientation()
+                #print(pos_valid(atual_piece))
+                    if not pos_valid(atual_piece,locked_positions):
+                        atual_piece.x -= size_piece
+                if event.key == pygame.K_LEFT:
+                    atual_piece.x -= size_piece 
+                #print(pos_valid(atual_piece))
+                    if not pos_valid(atual_piece,locked_positions):
+                        atual_piece.x += size_piece 
+                if event.key == pygame.K_DOWN:
+                    total_points += atual_piece.free_fall() 
+                    start_time_hard_drop = time()
+                    hard_drop_mode = True
+                if event.key == pygame.K_UP:
+                    atual_piece.change_orientation()
+            if event.key == pygame.K_p:
+                if not pause:
+                    pause_start = time()
+                else :
+                    pause_end = time()    
+                pause = not pause
+                
 
     curr_time = time()
     if velocity > 0.1:
         velocity = 0.5+(level*(-0.02))
 
-    if curr_time - start_time > velocity:
+    if curr_time - start_time > velocity and not pause:
         #print(curr_time-start_time) 
         start_time = time()
         atual_piece.fall()
 
-    if curr_time - start_time_level > 15:
+    if curr_time - start_time_level-(pause_end-pause_start) > 15 and not pause:
         start_time_level = time()
         level += 1
 
     if curr_time - start_time_hard_drop > 0.25:
         hard_drop_mode = False
 
-    print(hard_drop_mode)
+    #print(hard_drop_mode)
     #print(fallen_piece(atual_piece,locked_positions))
     if not hard_drop_mode:
-
         if fallen_piece(atual_piece,locked_positions):
             add_locked(atual_piece,locked_positions)
-            atual_piece = get_piece()
+            atual_piece = next_piece
+            next_piece = get_piece()
             if not pos_valid(atual_piece,locked_positions):
                 sys.exit()
     
@@ -324,7 +335,8 @@ while 1:
         total_points += add_points_lines(cleared_lines,level)
 
     #print(n_elem)
-    print_shape(atual_piece)
+    print_shape(atual_piece,atual_piece.x,atual_piece.y)
+    print_shape(next_piece,2*gap+play_width+75-10,2*gap+200)
     print_locked(locked_positions)
 
     """ print(atual_piece.x)
